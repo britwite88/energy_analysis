@@ -3,7 +3,7 @@
 > A comprehensive data science project analyzing residential energy consumption patterns in northeastern Mexico using machine learning approaches.
 
 **Author:** Samuel  
-**Date:** August 8, 2025  
+**Date:** August 24, 2024  
 **Status:** ✅ Complete  
 
 [![R](https://img.shields.io/badge/R-276DC3?style=flat&logo=r&logoColor=white)](https://www.r-project.org/)
@@ -310,10 +310,10 @@ library(leaps)       # Feature selection
 
 ## 📞 Contact
 
-**Author:** Samuel  
+**Author:** Akande Samuel  
 **Project:** Energy Consumption Analysis  
-**Institution:** [Your Institution]  
-**Email:** [your.email@domain.com]  
+**Institution:** [Robert Gordon University]  
+**Email:** [samuelakande202@gmail.com]
 
 ### 🤝 Contributing
 Contributions, issues, and feature requests are welcome!  
@@ -334,7 +334,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **⭐ Star this repo if you found it helpful!**
 
 Made with ❤️ and R
-
-![Visitors](https://visitor-badge.glitch.me/badge?page_id=yourusername.energy-consumption-analysis)
 
 </div>
