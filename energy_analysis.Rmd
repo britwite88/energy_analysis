@@ -1,0 +1,2133 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-07-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Required packages for data wrangling and model training
+```{r}
+library(dplyr)
+library(Hmisc)
+library(caret)
+library(corrplot)
+library(leaps)
+library(ggplot2)
+library(RColorBrewer)
+library(lubridate)
+library(zoo)
+library(pROC)
+library(randomForest)
+library(e1071)
+library(rpart) 
+library(rpart.plot)
+library(xgboost)
+library(MLmetrics)  
+library(xts)
+library(tidyr)
+
+```
+# Using the read.csv function to load dataset
+
+```{r}
+energy <- read.csv(here::here("data", "energy_weather.csv"),
+         header = TRUE,
+         stringsAsFactors = TRUE)
+
+```
+The samples is collected from a publicly accessible web domain and it consist of the energy consumption of some residential buildings in the urban area of northeastern region of mexico. The data set is a one minute resolution timed-series and comprises of 605260 observations of 19 variables with  main as factor with 8 levels and description with 16 levels
+
+```{r}
+summary(energy)
+```
+The variables active_power, reactive_power, and apparent_power display a notable extent of dispersion, with their maximum values surpassing 2900, thus implying the existence of outliers. These anomalies may arise from periods of heightened energy consumption or inaccuracies in measurement. Current, too, showcases a broad range (ranging from 0.300 to 24.410), hinting at possible outliers associated with extreme current magnitudes. Temperature, feels_like, and temp_max exhibit wide ranges that encompass both extremely low and high temperatures, potentially attributed to seasonal fluctuations. Wind speed, similarly, presents a substantial spread (ranging from 0 to 10.290), indicating the presence of potential outliers stemming from abnormally strong winds.
+
+```{r}
+
+```
+
+# Dataframe structure
+```{r}
+str(energy)
+```
+
+# Checking for missing values
+```{r}
+# Inspect for missing values
+missing_values <- sapply(energy, function(x) sum(is.na(x)))
+print("Missing values in each column:")
+print(missing_values)
+
+```
+Based on the results obtained, there are no missing values in the data set.  
+
+# Inspecting and removing duplicates
+```{r}
+cat("Number of rows in the dataframe: ", nrow(energy), "\n")
+
+# Check for duplicate rows 
+duplicates <- sum(duplicated(energy))
+cat("Number of duplicate rows: ", duplicates, "\n")
+
+# Remove duplicate rows
+energy <- energy %>% distinct()
+cat("Number of rows after removing duplicates: ", nrow(energy), "\n")
+
+```
+# Visualization of the distribution for active_power using histogram
+```{r}
+summary(energy$active_power)
+```
+
+```{r}
+ggplot(data = energy, aes(x=active_power)) + geom_histogram(bins = 30)
+
+```
+The histogram illustrates the distribution of daily energy consumption, particularly in active power terms. The distribution exhibits a significant bias towards the right, with most days showing moderate energy usage and a tail extending towards higher values. At around 100, the histogram displays a distinct peak, indicating the most frequent occurrence of daily active power. The median value is slightly above this peak, approximately 150. Active power figures cover a broad spectrum, from 0 to over 3000, with outliers hinting at days with exceptionally high energy consumption. Typically, daily active power usage is minimal, reflecting the standard energy requirements for usual activities. Days with high energy demands are distinguished by a long tail in the distribution, suggesting that some days necessitate significantly more energy. Further examination can shed light on the underlying factors contributing to these instances of extreme energy consumption. Additional analysis can assist in uncovering patterns and trends in the dynamics of energy usage.
+
+# Visualization of the distribution for current using histogram
+```{r}
+summary(energy$temp)
+```
+```{r}
+ggplot(data = energy, aes(x=temp)) + geom_histogram(bins = 30)
+```
+The distribution of temperatures illustrated in the histogram is evenly balanced and bell-shaped, with the majority of temperatures grouped around the 20-degree Celsius mark. Around this point lies the peak temperature, implying it is the most commonly occurring temperature within the dataset. Temperature readings span from 0 to 40 degrees Celsius, with a concentration primarily falling between 10 and 30 degrees Celsius. Notably, there are no noticeable deviants present, stressing the neatness of the dataset. It is probable that both the mean and median temperatures closely align with this peak value, a further indication of the dataset's overall cleanliness and lack of extreme values that could potentially distort the analysis.
+
+# Visualization of the distribution for humidity using histogram
+```{r}
+summary(energy$humidity)
+```
+```{r}
+ggplot(data = energy, aes(x=humidity)) + geom_histogram(bins = 30)
+```
+The histogram illustrates a distribution of humidity levels within a dataset that exhibits symmetry, reminiscent of a Gaussian distribution. Positioned between 40% and 60%, the peak signifies the prevailing humidity levels. Ranging from 0% to 100%, the humidity values predominantly cluster between 20% and 80%. Noteworthy is the absence of any conspicuous outliers in the distribution, with frequencies declining towards the extremes. The dataset encapsulates a spectrum of humidity conditions, devoid of extreme values that could potentially distort the outcomes.
+
+# Visualization of the distribution for apparent_power using histogram
+```{r}
+summary(energy$apparent_power)
+```
+```{r}
+ggplot(data = energy, aes(x=apparent_power)) + geom_histogram(bins = 40)
+```
+
+# Visualization of the distribution for temperature, active_power and description using scatter plot
+```{r}
+ggplot(data = energy, aes(x=active_power, y = temp, col = description)) + geom_point()
+
+```
+The depiction of data in the scatter plot illustrates the correlation among active power, temperature, and weather description. The active power readings exhibit a wide dispersion, spanning from zero to approximately 3000, with the majority of data points clustered below 1000. However, temperature data is predominantly distributed within the range of -5°C to 40°C, with a concentration of data points falling between 10°C and 30°C. Sixteen distinct weather descriptions are identified, each denoted by a unique color. While a robust linear relationship between active power and temperature is lacking, there is a subtle inclination towards higher active power levels at moderate temperatures. Weather conditions such as "clear sky" and "broken clouds" display a broad range of active power values, suggesting greater variability in power consumption under these circumstances. The association between temperature and weather description is apparent, as heavy intensity rain and moderate rain tend to occur at lower temperatures, while clear sky and few clouds are observed at higher temperatures.
+
+# Visualization of the distribution for temperature, active_power and main using scatter plot
+```{r}
+ggplot(data = energy, aes(x=active_power, y = temp, col = main)) + geom_point()
+
+```
+# Visualization of the distribution for temperature, active_power and main using box plot
+```{r}
+ggplot(data = energy, aes(x=temp, y=active_power, fill = main)) + geom_boxplot()
+```
+The boxplot shows the relationship between active power and temperature, categorized by different weather conditions. Clear and cloudy conditions have the highest median active power, indicating greater energy consumption. Drizzle, fog, haze, mist, and rain have similar median active power levels, with less variability. Thunderstorms have the lowest median active power and narrowest spread, indicating lower energy consumption during thunderstorms. The plot does not show a strong linear relationship between temperature and active power, but there is a subtle indication that active power might be slightly higher at moderate temperatures. Clear weather has a wider range of active power values, suggesting factors beyond temperature influence energy consumption. Outliers, particularly at higher temperatures, indicate unusually high active power consumption.
+
+# Visualization of the distribution for humidity, active_power and main using box plot
+```{r}
+ggplot(data = energy, aes(y=active_power, x=humidity, fill = main)) + geom_boxplot()
+
+```
+The boxplot shows the relationship between active power consumption, humidity levels, and weather conditions. Humidity has a minor impact, with the median active power appearing stable across different humidity levels. Weather conditions are more significant, with clear and cloudy weather exhibiting higher median active power across all humidity levels. Variations within weather types and humidity levels are evident, suggesting other factors like time of day, temperature, or specific activities may play a crucial role. Outliers indicate unusually high active power consumption, possibly due to specific events, measurement errors, or extreme weather conditions combined with other factors.
+
+# Visualization of the distribution for active_power and main using box plot
+```{r}
+ggplot(data = energy, aes(y=active_power, x=main)) + geom_boxplot()
+
+```
+The boxplot shows the distribution of active power across different weather conditions. Clear and cloudy conditions have the highest median active power, suggesting slightly higher energy consumption. Drizzle, fog, haze, mist, and rain have similar median active power levels, suggesting comparable energy usage patterns. Thunderstorms have the lowest median active power, suggesting lower energy consumption during thunderstorms. All weather conditions show a wide range of active power values, with clear days having the widest spread. Outliers, represented by individual dots outside the whiskers, indicate unusually high active power values in certain instances. The boxplot suggests that weather conditions might influence active power consumption, but other factors likely play a more significant role.
+
+# Visualization using boxplot to inspect outliers
+```{r}
+create_plots <- function(data, feature_name) {
+  # Box Plot
+  box_plot <- ggplot(data, aes_string(y = feature_name)) +
+    geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
+    ggtitle(paste("Box Plot of", feature_name)) +
+    ylab(feature_name) +
+    theme_minimal()
+  
+  # Histogram
+  hist_plot <- ggplot(data, aes_string(x = feature_name)) +
+    geom_histogram(binwidth = 10, fill = "blue", color = "black", alpha = 0.7) +
+    ggtitle(paste("Histogram of", feature_name)) +
+    xlab(feature_name) +
+    ylab("Frequency") +
+    theme_minimal()
+  
+  # Print plots
+  print(box_plot)
+  print(hist_plot)
+}
+
+# Create visualizations for each feature
+create_plots(energy, "active_power")
+create_plots(energy, "apparent_power")
+create_plots(energy, "reactive_power")
+create_plots(energy, "voltage")
+create_plots(energy, "current")
+
+```
+Boxplots show the distribution of five electrical power variables: active power, apparent power, current, voltage, and reactive power. Active power, apparent power, reactive power, and current show a similar pattern, with most data points concentrated at lower values and outliers at higher values. The median is close to the bottom, suggesting low to moderate power levels. Voltage distribution is markedly different, with a well-defined central value and limited spread. Possible explanations include peak demand periods, equipment malfunctions, data recording errors, grid fluctuations, and equipment issues.
+
+
+# Removing outliers from samples using Interquater range
+```{r}
+# List of numeric power variables 
+power_variables <- c("active_power", "reactive_power", "apparent_power", "voltage", "current")
+
+# Function to remove outliers using the IQR method
+remove_outliers_iqr <- function(data, columns) {
+  data %>% mutate(across(all_of(columns), ~ {
+    Q1 <- quantile(., 0.25, na.rm = TRUE)
+    Q3 <- quantile(., 0.75, na.rm = TRUE)
+    IQR <- Q3 - Q1
+    lower_bound <- Q1 - 1.5 * IQR
+    upper_bound <- Q3 + 1.5 * IQR
+    ifelse(. < lower_bound | . > upper_bound, NA, .)
+  }))
+}
+
+# Apply the function to the energy dataframe
+energy_capped<- remove_outliers_iqr(energy, power_variables)
+
+summary(energy_capped[, power_variables])
+
+```
+
+
+```{r}
+
+
+```
+
+
+# Visualize the capped data for each power-related variable
+```{r}
+create_plots <- function(data, feature_name) {
+  # Box Plot
+  box_plot <- ggplot(data, aes_string(y = feature_name)) +
+    geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
+    ggtitle(paste("Box Plot of Capped", feature_name)) +
+    ylab(feature_name) +
+    theme_minimal()
+  
+  # Print plots
+  print(box_plot)
+ 
+}
+
+# Create visualizations for each power-related variable
+for (var in power_variables) {
+  create_plots(energy_capped, var)
+}
+```
+
+
+```{r}
+
+
+```
+
+
+# Date Coversion to POSIXct type using a function
+```{r}
+processDateTime = function(d, t, d_format, t_format){
+ d = as.character(d)
+ t = as.character(t)
+ as.POSIXct(strptime(paste(d, " ", t), paste(d_format, " ", t_format)))
+}
+
+```
+
+
+# Splitting the 'date' field into 'date' and 'time' parts
+```{r}
+energy$date_only <- format(as.POSIXct(energy$date, format="%d/%m/%Y %H:%M"), "%d/%m/%Y")
+energy$time_only <- format(as.POSIXct(energy$date, format="%d/%m/%Y %H:%M"), "%H:%M")
+```
+
+
+# Applying the POSIXct function
+```{r}
+energy_capped$datetime = processDateTime(energy$date_only, energy$time_only, "%d/%m/%Y", "%H:%M")
+energy$datetime = processDateTime(energy$date_only, energy$time_only, "%d/%m/%Y", "%H:%M")
+
+head(energy$datetime, 10)
+
+```
+
+
+```{r}
+
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+
+
+# Visualization plot of hourly trend of active power
+```{r}
+str(energy)
+# Convert datetime to a date-hour format for aggregation
+energy$datetime_hour <- format(energy$datetime, "%Y-%m-%d %H")
+
+# Aggregate data by the new datetime_hour
+hourly_avg <- energy %>%
+  group_by(datetime_hour) %>%
+  summarise(active_power_avg = mean(active_power, na.rm = TRUE))
+
+# Convert datetime_hour back to POSIXct for plotting
+hourly_avg$datetime_hour <- as.POSIXct(hourly_avg$datetime_hour, format = "%Y-%m-%d %H")
+
+ggplot(hourly_avg, aes(x = datetime_hour, y = active_power_avg)) +
+  geom_line() + # Line plot to show the trend
+  geom_point(size = 0.5, alpha = 0.5) 
+  theme_minimal() +
+  labs(title = "Hourly Trend of Active Power",
+       x = "Time",
+       y = "Average Active Power") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Improve x-axis label readability
+
+```
+The plot shows the hourly trend of average active power consumption from 2022 to 2024. It shows a clear seasonal pattern, peaking in winter and reaching its lowest in summer. Daily fluctuations in active power are significant, possibly due to variations in household or industrial activities. Outliers, particularly during winter, are hours with high consumption, possibly due to extreme weather events. Data gaps, particularly during early 2022, may be due to missing data points or periods without recorded data. Despite these fluctuations, there is no significant overall increasing or decreasing trend in active power consumption, with average power levels remaining relatively stable across years.
+
+
+# Decomposed components of a time series showing trend and seasonality
+```{r}
+
+energy_series <- energy %>% select(datetime, active_power)
+
+# Convert the data to a time series object 
+ts_energy <- ts(energy_series$active_power, frequency = 1440)  # 1440 minutes in a day
+
+# Decompose the time series using STL
+decomposed_energy <- stl(ts_energy, s.window = "periodic")
+
+# Plot the decomposed components
+plot(decomposed_energy)
+
+```
+The time series decomposition plot illustrates a notable level of variability in energy usage over a period, indicating significant fluctuations. The seasonal element depicts recurring patterns at consistent intervals, suggesting foreseeable fluctuations. The trend aspect portrays the extended-term trajectory of the time series, presenting an overall rise in energy consumption over time. The residual component, also referred to as noise or residuals, encapsulates arbitrary fluctuations in the time series that are not accounted for by the trend or seasonal elements. The visualization implies that the energy consumption time series is impacted by both a seasonal cycle and a prolonged upward trend, yet the presence of a greatly variable residual component indicates additional factors influencing energy consumption beyond these two elements.
+
+
+```{r}
+
+                     
+```
+
+# Active Power vs Time of Day
+```{r}
+# Subset the active power and datetime columns
+energy <- energy %>% select(datetime, active_power)
+
+# Ensure datetime is in POSIXct format
+energy$datetime <- as.POSIXct(energy$datetime)
+
+# Extract time of day
+energy <- energy %>%
+  mutate(time_of_day = format(datetime, "%H:%M:%S"))
+
+# Plot active_power vs time_of_day
+ggplot(energy, aes(x = as.POSIXct(time_of_day, format = "%H:%M:%S"), y = active_power)) +
+  geom_line(color = 'blue') +
+  scale_x_datetime(date_labels = "%H:%M", date_breaks = "1 hour") +
+  ggtitle("Active Power vs Time of Day") +
+  xlab("Time of Day") + ylab("Active Power") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+The illustration depicts a 24-hour cycle of active power utilization, displaying a daily pattern characterized by fluctuations in energy consumption levels, alternating between low and high. During the night period (00:00 - 06:00), there is a consistent presence of low and stable active power, denoting a decrease in energy consumption while individuals are asleep. In the morning hours (06:00 - 12:00), there is a discernible rise in active power, peaking typically between 10:00 and 12:00, indicating heightened energy usage attributed to morning-related tasks. The afternoon period (12:00 - 18:00) maintains elevated levels of active power with notable fluctuations, signaling sustained high energy usage. By evening (18:00 - 23:00), there is a second peak in active power, succeeded by a gradual decrease towards midnight, reflecting a probable increase in energy consumption as individuals engage in evening activities before retiring to bed.
+
+
+
+```{r}
+
+
+```
+
+```{r}
+
+```
+# Distribution of active power after removing outliers
+
+```{r}
+
+ggplot(data = energy_capped, aes(x=active_power)) + geom_histogram(bins = 30)
+
+summary(energy_capped$active_power)
+
+```
+
+# Exploring dependence between numerical variables using correlation plot
+```{r}
+set.seed(123)
+
+# Select only the numerical columns
+numerical_columns <- energy_capped %>% select_if(is.numeric)
+
+# Compute the correlation matrix
+correlation_matrix <- cor(numerical_columns, use = "complete.obs")
+
+# Correlation plot 
+corrplot(correlation_matrix, method = "number", type = "upper", 
+         col = brewer.pal(n = 8, name = "RdBu"), 
+         tl.col = "black", tl.srt = 45, 
+         addCoef.col = "black", 
+         number.cex = 0.7,
+         na.label = " ")
+
+```
+The illustration depicts a correlation matrix that examines the associations among electrical power parameters and environmental factors. Within the matrix, robust positive correlations are evident between active power, reactive power, and apparent power, as well as between active power and current. The variables of Temperature and feels like temperature exhibit a nearly perfect correlation, indicating that the metric for "feels like" temperature closely reflects the actual temperature. Moderate positive relationships are observed between current and reactive power, apparent power, as well as between temperature, minimum temperature, and maximum temperature. The majority of other variables demonstrate weak correlations, implying a lack of substantial linear relationships. An average neutral correlation is found between humidity and temperature, indicating that as temperature rises, humidity generally remains stable.
+
+```{r}
+
+
+```
+
+
+# Visualizating the strong positive correlation of active power and current using scatter plot
+```{r}
+  ggplot(energy_capped, aes(x = active_power, y = current, colour = active_power)) + 
+  geom_point() + scale_color_gradient(low = "blue", high = "red")
+
+  labs(title = "Scatter Plot of Active Power vs Current",
+                            x = "Active Power", y = "Current")
+```
+The visualization show very strong relationship between current and active power as the data points are mostly compacted, hence forming a straight line. As power consumption increases, the current also increase.
+
+```{r}
+  
+```
+
+
+# Visualizing negative strong correlation of Hummidity and temperature 
+```{r}
+
+ggplot(energy_capped, aes(x = humidity, y = temp, colour = humidity)) + 
+  geom_point() + scale_color_gradient(low = "navy", high = "orange")
+
+  labs(title = "Scatter Plot of Humidity vs Temperature",
+                            x = "Humidity", y = "Temperature")
+
+```
+
+# Exploring the strong positive correlation of current and apparent power using scatter plot
+
+```{r}
+ggplot(energy_capped, aes(x = apparent_power, y = current, colour = apparent_power  )) + 
+  geom_point() + scale_color_gradient(low = "navy", high = "orange")
+```
+
+# Exploring the strong correlation of active power and apparent power using scatter plot
+```{r}
+ggplot(energy_capped, aes(x = active_power, y = apparent_power, colour = apparent_power  )) + 
+  geom_point() + scale_color_gradient(low = "navy", high = "red")
+
+```
+# Distribution of 'main' categorical variable
+```{r}
+# Bar plot for 'main' categorical variable
+ggplot(energy_capped, aes(x = main)) +
+  geom_bar(fill = "skyblue") +
+  labs(title = "Distribution of 'main' Categorical Variable", x = "Main", y = "Count") +
+  theme_minimal()
+
+
+```
+
+# Distribution of 'description' categorical variable
+```{r}
+
+# Bar plot for 'description' categorical variable
+ggplot(energy_capped, aes(x = description)) +
+  geom_bar(fill = "lightgreen") +
+  labs(title = "Distribution of 'description' Categorical Variable", x = "Description", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+# Handling Rare Categories
+```{r}
+
+# Define a threshold for rare categories with less than 1% of the total count
+threshold <- 0.01 * nrow(energy_capped)
+
+# For 'main' variable
+main_counts <- energy_capped %>% count(main)
+rare_mains <- main_counts %>% filter(n < threshold) %>% pull(main)
+
+# For 'description' variable
+description_counts <- energy_capped %>% count(description)
+rare_descriptions <- description_counts %>% filter(n < threshold) %>% pull(description)
+
+# Replace rare categories with 'Other'
+energy_category <- energy_capped %>%
+  mutate(
+    main = ifelse(main %in% rare_mains, 'Other', as.character(main)),
+    description = ifelse(description %in% rare_descriptions, 'Other', as.character(description))
+  )
+
+```
+This aims to identify and consolidate infrequent categories within the main and description variables, likely representing weather conditions or descriptions. Categories occurring in less than 1% of total observations are considered "rare" and combined into a single "Other" category. 
+
+# Create interaction terms for categorical variable
+```{r}
+# Interaction terms between weather conditions and other numerical features (temp and humidity)
+energy_category <- energy_category %>%
+  mutate(
+    temp_main_interaction = temp * (main == 'Clear'),  
+    humidity_description_interaction = humidity * (description == 'clear sky')
+  )
+
+# View the first few rows of the data set with new features
+head(energy_category)
+
+```
+Interaction terms in statistical models assess the relationship between numerical features (temperature, humidity) and energy consumption based on weather conditions. In this case, two new columns are created: temp_main_interaction and humidity_description_interaction. The temp_main_interaction column represents the interaction between temperature and the "Clear" weather condition, while the humidity_description_interaction column focuses on the interaction between humidity and the "clear sky" weather description. 
+
+# Inspecting missing values 
+```{r}
+
+missing_values <- sapply(energy_category, function(x) sum(is.na(x)))
+print("Missing values in each column:")
+print(missing_values)
+
+```
+
+# Visualizing the missing values over time
+```{r}
+
+# Step 1: Create missing value indicators
+energy_category <- energy_category %>%
+  mutate(
+    missing_active_power = is.na(active_power),
+    missing_current = is.na(current),
+    missing_voltage = is.na(voltage),
+    missing_reactive_power = is.na(reactive_power),
+    missing_apparent_power = is.na(apparent_power)
+  )
+
+
+# Plot to inspect if missing values in active_power are spread over time
+ggplot(energy_category, aes(x = datetime)) +
+  geom_point(aes(y = as.integer(missing_active_power)), color = "red") +
+  labs(title = "Missing Active Power over Time",
+       y = "Missing Indicator (1 = Missing, 0 = Not Missing)") +
+  theme_minimal()
+
+# Plot for current
+ggplot(energy_category, aes(x = datetime)) +
+  geom_point(aes(y = as.integer(missing_current)), color = "blue") +
+  labs(title = "Missing Current over Time",
+       y = "Missing Indicator (1 = Missing, 0 = Not Missing)") +
+  theme_minimal()
+
+# Plot for voltage
+ggplot(energy_category, aes(x = datetime)) +
+  geom_point(aes(y = as.integer(missing_voltage)), color = "green") +
+  labs(title = "Missing Voltage over Time",
+       y = "Missing Indicator (1 = Missing, 0 = Not Missing)") +
+  theme_minimal()
+
+# Plot for reactive_power
+ggplot(energy_category, aes(x = datetime)) +
+  geom_point(aes(y = as.integer(missing_reactive_power)), color = "purple") +
+  labs(title = "Missing Reactive Power over Time",
+       y = "Missing Indicator (1 = Missing, 0 = Not Missing)") +
+  theme_minimal()
+
+# Plot for apparent_power
+ggplot(energy_category, aes(x = datetime)) +
+  geom_point(aes(y = as.integer(missing_apparent_power)), color = "orange") +
+  labs(title = "Missing Apparent Power over Time",
+       y = "Missing Indicator (1 = Missing, 0 = Not Missing)") +
+  theme_minimal()
+
+
+# Select columns that have missing values along with datetime
+energy_missing <- energy_category %>%
+  select(datetime, missing_active_power, missing_current, missing_voltage, 
+         missing_reactive_power, missing_apparent_power)
+
+# View the first few rows of energy_missing
+head(energy_missing)
+
+
+```
+It is clear from the plots that the missing values are not randomly spread over time. Instead, they appear to be clustered during specific periods.
+
+
+
+```{r}
+
+
+
+```
+
+
+
+
+```{r}
+
+
+```
+
+
+# Addressing Non-Randomly Spread Missing Values Using Forward/Backward Fill
+```{r}
+
+# Forward fill
+energy_category <- energy_category %>%
+  mutate(
+    active_power = zoo::na.locf(active_power, na.rm = FALSE),
+    current = zoo::na.locf(current, na.rm = FALSE),
+    voltage = zoo::na.locf(voltage, na.rm = FALSE),
+    reactive_power = zoo::na.locf(reactive_power, na.rm = FALSE),
+    apparent_power = zoo::na.locf(apparent_power, na.rm = FALSE)
+  )
+
+# Backward fill
+energy_category <- energy_category %>%
+  mutate(
+    active_power = zoo::na.locf(active_power, fromLast = TRUE, na.rm = FALSE),
+    current = zoo::na.locf(current, fromLast = TRUE, na.rm = FALSE),
+    voltage = zoo::na.locf(voltage, fromLast = TRUE, na.rm = FALSE),
+    reactive_power = zoo::na.locf(reactive_power, fromLast = TRUE, na.rm = FALSE),
+    apparent_power = zoo::na.locf(apparent_power, fromLast = TRUE, na.rm = FALSE)
+  )
+
+
+
+# Forward fill missing datetime values
+energy_category <- energy_category %>%
+  arrange(datetime) %>%  # Ensure the data is sorted by datetime
+  mutate(datetime = na.locf(datetime, na.rm = FALSE))
+
+# Backward fill remaining missing datetime values
+energy_category <- energy_category %>%
+  mutate(datetime = na.locf(datetime, fromLast = TRUE, na.rm = FALSE))
+
+# Check the first few rows of the dataset to verify imputation
+head(energy_category)
+
+```
+# Verify imputation for power variables
+```{r}
+missing_values <- sapply(energy_category, function(x) sum(is.na(x)))
+print("Verify imputation for missing values in each column:")
+print(missing_values)
+```
+
+
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+
+```
+
+
+
+# Converting the target variable (active_power) to categorical
+```{r}
+# Define bins for active_power
+bins <- quantile(energy_category$active_power, probs = seq(0, 1, 0.25))
+labels <- c("Low", "Medium-Low", "Medium-High", "High")
+
+# Convert active_power to categorical
+energy_category <- energy_category %>%
+  mutate(active_power_class = cut(active_power, breaks = bins, labels = labels, include.lowest = TRUE))
+
+# View the distribution of the new categorical variable
+table(energy_category$active_power_class)
+
+
+bin_ranges <- data.frame(
+  Label = labels,
+  Lower_Bound = bins[-length(bins)],
+  Upper_Bound = bins[-1]
+)
+
+# View the bin ranges
+print(bin_ranges)
+
+```
+
+# Encoding Categorical Variables
+```{r}
+# Create dummy variables for 'main' and 'description' columns
+dummies <- dummyVars(~ main + description, data = energy_category)
+
+# Transform the data set
+energy_transformed <- predict(dummies, newdata = energy_category)
+
+# Convert to data frame
+energy_transformed <- as.data.frame(energy_transformed)
+
+# Remove the original 'main' and 'description' columns 
+energy_final <- cbind(select(energy_category, -main, -description), energy_transformed)
+
+head(energy_final)
+
+```
+
+
+# Features Selection
+```{r}
+set.seed(123)
+
+# Feature selection with a  one-variable predictor
+model1 = lm(active_power ~ current, data = energy_final)
+
+summary(model1)
+
+```
+The linear regression analysis (lm) conducted in R depicted active_power as a function of current, where current served as the independent variable. The residuals of the model exhibited a slightly skewed distribution, with the most negative residual (-319.23) indicating the most substantial underestimation. The estimated coefficients, encompassing the intercept (-25.95499) and slope (120.86659), signified a significantly robust association between current and active_power. The model accounted for 96.73% of the variability in active_power, implying that current serves as a reliable predictor of active_power. The adjusted R-squared stood at 0.9673, and both the F-statistic and p-value demonstrated statistical significance, providing compelling evidence that current effectively predicts active_power. The model's strong positive correlation with active_power and current underscores the utility of current as a predictor for active_power.
+
+
+```{r}
+# Feature selection with a  two-variable predictor
+model2 = lm(active_power ~ current+apparent_power, data = energy_final)
+
+summary(model2)
+
+```
+
+
+```{r}
+# Feature selection with a  three-variable predictor
+model3 = lm(active_power ~ current+apparent_power+power_factor+reactive_power, data = energy_final)
+
+summary(model3)
+
+```
+
+# Extract datetime components
+```{r}
+#energy_final <- energy_final %>%
+  #mutate(
+    #hour = as.numeric(format(datetime, "%H")),
+    #day = as.numeric(format(datetime, "%d")),
+    #month = as.numeric(format(datetime, "%m")),
+    #day_of_week = as.numeric(format(datetime, "%u"))
+ #)
+
+```
+
+
+# Creating new sample data (5% of original dataset)
+```{r}
+# Calculate new sample size (10% of the dataset)
+New_Sample <- floor(0.05 * nrow(energy_final))
+
+# Calculate the sample size per class
+New_Sample_per_class <- New_Sample / length(unique(energy_final$active_power_class))
+
+# To Create a stratified sample ensuring equal representation of the target variable
+
+set.seed(123) # for reproducibility
+Energy_New <- energy_final %>%
+  group_by(active_power_class) %>%
+  sample_n(ceiling(New_Sample_per_class))
+
+
+# Save the new sampled data to a new data frame
+Energy_New_df <- as.data.frame(Energy_New)
+
+# View the first few rows of the sampled data
+head(Energy_New_df)
+
+
+```
+
+
+# Feature Engineering 
+```{r}
+# Lag Features
+energy_final2 <- Energy_New_df %>%
+  arrange(datetime) %>% # Ensure data is sorted by time
+  mutate(
+    lag_active_power_1 = lag(active_power, n = 1),   # 1-minute lag
+    lag_active_power_60 = lag(active_power, n = 60),  # 1-hour lag
+    lag_active_power_1440 = lag(active_power, n = 1440), # 1-day lag
+    lag_current_1 = lag(current, n = 1),
+    lag_temp_1 = lag(temp, n = 1),
+    lag_humidity_1 = lag(humidity, n = 1)
+  )
+
+#  Time Components
+energy_final2 <- energy_final2 %>%
+  mutate(
+    hour_of_day = as.numeric(format(datetime, "%H")),
+    day_of_week = as.numeric(format(datetime, "%u")), 
+    month_of_year = as.numeric(format(datetime, "%m")),
+    is_weekend = ifelse(day_of_week %in% c(6, 7), 1, 0) # 1 for weekend, 0 for weekday
+  ) 
+
+# Rolling Statistics
+energy_final2 <- energy_final2 %>%
+  mutate(
+    rolling_mean_active_power_30 = rollmean(active_power, k = 30, fill = NA, align = "right"), # 30-min moving average
+    rolling_max_active_power_60 = rollapply(active_power, width = 60, FUN = max, fill = NA, align = "right"), # 1-hour max
+    rolling_mean_temp_7 = rollmean(temp, k = 7*24*60, fill = NA, align = "right"), # 7-day moving average
+    rolling_std_temp_7 = rollapply(temp, width = 7*24*60, FUN = sd, fill = NA, align = "right") 
+  )
+
+# Weather-Related Interactions
+energy_final2 <- energy_final2 %>%
+  mutate(
+    temp_x_hour_of_day = temp * hour_of_day,
+    humidity_x_month_of_year = humidity * month_of_year
+  )
+
+head(energy_final2)
+
+```
+
+
+
+```{r}
+
+
+
+```
+
+
+# Verify that there are no missing values left
+```{r}
+
+missing_values_after <- sapply(energy_final2, function(x) sum(is.na(x)))
+print("Missing values after imputation:")
+print(missing_values_after)
+```
+However, the lag features and rolling statistic have introduce some missing values. Therefore, this will be omitted from the dataframe.
+
+# Omit missing values
+```{r}
+energy_final2 <- na.omit(energy_final2)
+
+
+```
+
+# Remove redundant columns
+```{r}
+
+energy_final2$date <- NULL
+energy_final2$datetime <- NULL
+energy_final2$active_power <- NULL
+
+```
+
+
+
+
+```{r}
+
+
+
+Energy_New_df <- energy_final2
+
+```
+Due to lack of high computational processing power requirements, I decided to train work with five percent of the dataset.
+
+
+# Check the distribution of target variable of the new sampled data
+```{r}
+
+table(Energy_New_df$active_power_class)
+
+
+```
+
+
+```{r}
+
+
+```
+
+# Feature Selection Using the Recursive Feature Elimination with Cross-Validation
+```{r}
+
+# Check the unique classes in the response variable
+unique_classes <- unique(Energy_New_df$active_power_class)
+print(unique_classes)
+
+# Ensure there are at least two classes
+if (length(unique_classes) < 2) {
+  stop("The response variable must have at least two unique classes.")
+}
+
+# Define the predictor and response variables
+predictors <- Energy_New_df %>% select(-active_power_class)
+response <- Energy_New_df$active_power_class
+
+# Define the control using rfeControl
+control <- rfeControl(functions = rfFuncs, 
+                      method = "cv",       
+                      number = 5)         
+
+# Run RFE
+set.seed(123)
+rfe_results <- rfe(predictors, response,
+                   sizes = c(1:56), 
+                   rfeControl = control)
+
+# Print the results
+print(rfe_results)
+
+# List the chosen features
+chosen_features <- predictors(rfe_results)
+print(chosen_features)
+
+# Create a new dataset with the selected features
+Energy_New_df_selected <- Energy_New_df %>% select(all_of(chosen_features), active_power_class)
+
+# Check the structure of the new dataset
+str(Energy_New_df_selected)
+
+```
+
+
+# Data Splitting (Train = 80%, Test = 20%)
+```{r}
+
+set.seed(123) 
+
+# Create data partition to ensure the target is evenly distributed across the training and testing set
+Train_partition <- createDataPartition(Energy_New_df_selected$active_power_class, p = 0.8, list = FALSE)
+
+# Create the training and testing datasets
+Train_data <- Energy_New_df_selected[Train_partition, ]
+Test_data <- Energy_New_df_selected[-Train_partition, ]
+
+# Create control for all models
+ctrl = trainControl(method = 'cv', number = 5)
+
+
+```
+
+
+# Distribution of the target variable in the train and test set
+```{r}
+# Distribution of the target variable in the training set
+cat("Training Set Distribution:\n")
+print(table(Train_data$active_power_class))
+
+# Distribution of the target variable in the testing set
+cat("\nTesting Set Distribution:\n")
+print(table(Test_data$active_power_class))
+
+```
+
+# Model for Random Forest Using Default Settings
+```{r}
+set.seed(123)
+
+# Train the RF model using default settings
+rf_model <- randomForest(active_power_class ~ ., 
+                         data = Train_data)
+
+# Print the model details
+print(rf_model)
+
+```
+The Random Forest classifier forecasts the active_power_class by employing 500 decision trees, each utilizing three randomly chosen variables. It demonstrates a minimal out-of-bag error rate of 0.37% and exhibits robust performance across all categorical classes. The model showcases elevated accuracy, a limited number of misclassifications, and performance tailored to specific classes, thereby underscoring its efficacy in predicting active_power_class based on the training dataset.
+
+# Evaluate the model on Test set
+```{r}
+# Predict on the testing set
+rf_pred <- predict(rf_model, newdata = Test_data)
+
+```
+
+# Confusion matrix to evaluate performance
+```{r}
+
+conf_matrix <- confusionMatrix(rf_pred, Test_data$active_power_class)
+conf_matrix
+
+```
+The model exhibits an exceptional level of accuracy, achieving a commendable rate of 0.9965, thereby correctly predicting the classes for 99.65% of instances. This indicates a solid class-specific performance, noted for its heightened sensitivity, specificity, positive predictive value, and negative predictive value. The distribution of each class is equitably balanced, with proportions ranging from 0.2418 to 0.2607. There exists a minimal occurrence of misclassifications and an absence of significant bias, thereby underscoring its proficiency in the classification of data.
+
+
+# PostResampling
+```{r}
+postResample(rf_pred, Test_data$active_power_class)
+
+```
+
+# Plot model
+```{r}
+
+# Plot the error rate across trees
+plot(rf_model, main="Error Rate vs. Number of Trees")
+
+```
+# Plot feature importance
+```{r}
+
+importance <- importance(rf_model)
+varImpPlot(rf_model, main="Feature Importance")
+
+```
+
+
+# Precision, Recall and F1 Score
+```{r}
+# Extract Precision, Recall, and F1 Score 
+precision <- conf_matrix$byClass[, "Pos Pred Value"]  
+recall <- conf_matrix$byClass[, "Sensitivity"] 
+support <- table(Test_data$active_power_class)
+
+f1_score <- 2 * ((precision * recall) / (precision + recall))  
+        
+
+# Combine into a data frame
+metrics_rf <- data.frame(
+  Class = rownames(conf_matrix$byClass),
+  Precision = precision,
+  Recall = recall,
+  F1_Score = f1_score
+)
+
+# Print the metrics
+print(metrics_rf)
+
+```
+
+# Area under curve for Random forest model with defalt
+```{r}
+
+# Predict probabilities on the testing set with the tuned model
+rf_prob <- predict(rf_model, newdata = Test_data, type = "prob")
+
+# Setup plot area
+par(mfrow = c(2, 2))  # Adjust grid layout depending on the number of classes, e.g., 4 classes
+colors <- c("red", "blue", "green", "purple")  # Define colors for each ROC curve
+
+# Create a list to store ROC curves
+roc_curves <- list()
+
+for (i in 1:ncol(rf_prob)) {
+    # Convert multi-class to binary class responses for the current class
+    binary_response <- factor(ifelse(Test_data$active_power_class == colnames(rf_prob)[i], "pos", "neg"), levels = c("neg", "pos"))
+    
+    # Check if there are both positive and negative cases
+    if (sum(binary_response == "pos") > 0 && sum(binary_response == "neg") > 0) {
+        # Compute ROC curve using the pROC package
+        roc_curves[[i]] <- roc(binary_response, rf_prob[, i])
+        
+        # Plot the ROC curve
+        plot(roc_curves[[i]], main = paste("ROC Curve for", colnames(rf_prob)[i]), col = colors[i])
+        
+        # Add a legend displaying the exact AUC without rounding
+        legend("bottomright", legend = c(paste("AUC =", auc(roc_curves[[i]]))), fill = colors[i])
+    } else {
+        message(paste("Skipping ROC curve for", colnames(rf_prob)[i], ": No positive cases or no negative cases."))
+    }
+}
+
+
+
+```
+
+
+
+```{r}
+
+Energy_New_df_selected2 <- Energy_New_df_selected 
+
+set.seed(123) 
+
+# Create data partition 
+Train_partition2 <- createDataPartition(Energy_New_df_selected2$active_power_class, p = 0.8, list = FALSE)
+
+# Train and Test Split
+Train_data2 <- Energy_New_df_selected2[Train_partition2, ]
+Test_data2 <- Energy_New_df_selected2[-Train_partition2, ]
+
+```
+
+
+
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+# Random Forest Model Using Hyperparameters
+```{r}
+set.seed(123) 
+
+
+# Define the hyperparameter 
+tunegrid <- expand.grid(mtry = c(2, 4, 6)         # Number of variables randomly sampled at each split
+)
+
+# Define the control parameters for training
+control <- trainControl(
+  method = "cv",              # Use cross-validation
+  number = 5,                 # 5-fold cross-validation
+  search = "grid"             # Perform grid search over the hyperparameter grid
+)
+
+# Train the Random Forest model 
+set.seed(123)  
+rf_model_tune <- train(
+  active_power_class ~ ., 
+  data = Train_data2,
+  method = "rf",                
+  trControl = control,
+  tuneGrid = tunegrid,
+  ntree = 500
+)
+
+# Print the model 
+print(rf_model_tune)
+
+
+```
+The Random Forest algorithm, developed utilizing a dataset comprising 16,149 observations, employs 9 predictor variables to categorize instances into four distinct classifications: Low, Medium-Low, Medium-High, and High. The model exhibited optimal performance with mtry set to 4, attaining an accuracy of 0.9959751 and demonstrating the highest correlation between predicted and observed classes at 0.9946316.
+
+
+
+# Evaluate RF tune model
+```{r}
+# Predict on the testing set
+rf_pred_tune <- predict(rf_model_tune, newdata = Test_data2)
+
+# Confusion matrix to evaluate performance
+conf_matrix_rftune <- confusionMatrix(rf_pred_tune, Test_data2$active_power_class)
+conf_matrix_rftune
+
+```
+
+# RF Accuracy with tune
+```{r}
+
+postResample(rf_pred_tune, Test_data2$active_power_class)
+
+```
+
+
+# Plot RF_model_tune
+```{r}
+
+plot(rf_model_tune, type="b")
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+# Precision, Recall and F1 Score for RF with Tune
+```{r}
+# Extract Precision, Recall, and F1 Score 
+
+precision_rftune <- conf_matrix_rftune$byClass[, "Pos Pred Value"]  
+recall_rftune <- conf_matrix_rftune$byClass[, "Sensitivity"]        
+f1_score_rftune <- 2 * ((precision_rftune * recall_rftune) / (precision_rftune + recall_rftune)) 
+support_rftune <- table(Test_data2$active_power_class)  
+
+# Combine into a data frame
+metrics_rf_tune <- data.frame(
+  Class = rownames(conf_matrix_rftune$byClass),
+  Precision = precision_rftune,
+  Recall = recall_rftune,
+  F1_Score = f1_score_rftune
+)
+
+# Print the metrics
+print(metrics_rf_tune)
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+
+```
+
+
+# Area under curve for Random forest tuned model
+```{r}
+
+# Predict probabilities on the testing set with the tuned model
+rf_prob_tune <- predict(rf_model_tune, newdata = Test_data2, type = "prob")
+
+# Setup plot area
+par(mfrow = c(2, 2))  # Adjust grid layout depending on the number of classes, for example 4 classes here
+colors <- c("red", "blue", "green", "purple")  # Define colors for each ROC curve
+
+
+# create List for storing ROC curves
+roc_curves_tune <- list()
+
+for (i in 1:ncol(rf_prob_tune)) {
+    # Convert multi-class to binary class responses for the current class
+    binary_response <- ifelse(Test_data2$active_power_class == colnames(rf_prob_tune)[i], "pos", "neg")
+
+    # Compute ROC curve using the pROC package
+    roc_curves_tune[[i]] <- roc(binary_response, rf_prob_tune[, i], levels = c("neg", "pos"))
+
+    # Plot the ROC curve
+    plot(roc_curves_tune[[i]], main = paste("ROC Curve for", colnames(rf_prob_tune)[i]), col = colors[i])
+    # Add a legend displaying the AUC
+    legend("bottomright", legend = c(paste("AUC =", round(auc(roc_curves_tune[[i]]), 3))), fill = colors[i])
+}
+
+
+```
+
+
+# Standardize the data for numeric columns
+```{r}
+
+# Identify the numeric columns in the dataframe
+numeric_columns <- sapply(Energy_New_df_selected2, is.numeric)
+
+# Create a preprocessing object to standardize the numeric data
+preProcValues <- preProcess(Energy_New_df_selected2[, numeric_columns], method = c("center", "scale"))
+
+# Apply the preprocessing model to the data
+Energy_New_df_selected2[, numeric_columns] <- predict(preProcValues, Energy_New_df_selected2[, numeric_columns])
+
+# Check the summary of the standardized data
+summary(Energy_New_df_selected2)
+
+
+```
+
+# Spliting standardize data for Svm
+```{r}
+
+set.seed(123) 
+
+# Create data partition 
+Train_partition3 <- createDataPartition(Energy_New_df_selected2$active_power_class, p = 0.8, list = FALSE)
+
+# Train and Test Split
+Train_data3 <- Energy_New_df_selected2[Train_partition3, ]
+Test_data3 <- Energy_New_df_selected2[-Train_partition3, ]
+
+
+# Count the total number of observations in the training and test sets
+train_count <- nrow(Train_data3)
+test_count <- nrow(Test_data3)
+
+# Print the counts
+cat("Total number of observations in the training set:", train_count, "\n")
+cat("Total number of observations in the test set:", test_count, "\n")
+
+```
+
+
+
+# SVM baseline classification model 
+```{r}
+set.seed(123)
+# Train the SVM model
+
+start_time <- Sys.time()
+
+# Train the SVM model using default settings
+svm_model <- svm(active_power_class ~ ., 
+                 data = Train_data3)
+
+end_time <- Sys.time()
+
+# Calculate runtime
+runtime <- end_time - start_time
+print(paste("Model training runtime:", runtime))
+summary(svm_model)
+
+```
+
+
+# Make predictions on the test set for svm
+```{r}
+
+pred_svm <- predict(svm_model, Test_data3)
+
+# Evaluate the model
+conf_matrix_svm <- table(pred_svm, Test_data3$active_power_class)
+print(conf_matrix_svm)
+
+# Calculate accuracy
+accuracy <- sum(pred_svm == Test_data3$active_power_class) / length(pred_svm)
+print(accuracy)  
+
+
+```
+The matrix demonstrates a commendable level of accuracy, with the majority of values aligned along the principal diagonal, signifying a substantial frequency of accurate predictions. A limited number of misclassifications are observed, predominantly occurring between adjacent categories, which implies that the model exhibits some difficulty in distinguishing between closely related classifications. The comparable quantity of instances present in each category within the confusion matrix indicates a relatively equitable dataset. 
+
+
+# Svm model with 5-fold cross validation
+```{r}
+set.seed(123)
+# Train the SVM model using cross-validation
+
+start_time <- Sys.time()
+
+svm_model_cv <- train(
+  active_power_class ~ ., 
+  data = Train_data3, 
+  method = "svmRadial", 
+  trControl = ctrl
+)
+
+end_time <- Sys.time()
+
+# Calculate runtime
+runtime <- end_time - start_time
+print(paste("Model training runtime:", runtime))
+
+# Print the summary of the SVM model
+print(svm_model_cv)
+
+
+```
+
+
+
+```{r}
+# Make predictions on the test set
+pred_svm_cv <- predict(svm_model_cv, Test_data3)
+
+# Evaluate the model
+conf_matrix_cv <- table(pred_svm_cv, Test_data3$active_power_class)
+print(conf_matrix_cv)
+
+accuracy_svm_cv <- sum(pred_svm_cv == Test_data3$active_power_class) / length(pred_svm_cv)
+print(accuracy_svm_cv)  
+
+
+```
+
+
+
+# Setting up the grid of hyperparameters
+```{r}
+set.seed(123
+         )
+#tune_grid <- expand.grid(
+#  sigma = c(0.01, 0.05, 0.1),
+ # C = c(0.1, 1, 10)
+#)
+
+tune_grid <- expand.grid(
+  sigma = c(0.01, 0.05, 0.1, 0.5, 1),
+  C = c(0.1, 1, 10, 15, 20)
+)
+
+ctrl_svm_tune <- trainControl(
+  method = "cv",
+  number = 5,
+  savePredictions = "final",
+  classProbs = TRUE,
+  summaryFunction = multiClassSummary
+)
+
+# Ensure the target variable is a factor
+Train_data3$active_power_class <- as.factor(Train_data3$active_power_class)
+Test_data3$active_power_class <- as.factor(Test_data3$active_power_class)
+
+# Rename the levels of the target variable to valid R variable names
+levels(Train_data3$active_power_class) <- make.names(levels(Train_data3$active_power_class))
+levels(Test_data3$active_power_class) <- make.names(levels(Test_data3$active_power_class))
+
+# Double-check the levels
+print(levels(Train_data3$active_power_class))
+print(levels(Test_data3$active_power_class))
+
+
+```
+
+
+# SVM model with hyperparameters
+```{r}
+
+start_time <- Sys.time()
+
+svm_model_tune <- train(active_power_class ~ ., 
+                        data = Train_data3, 
+                        method = "svmRadial",
+                        probability = TRUE,
+                        trControl = ctrl_svm_tune,
+                        tuneGrid = tune_grid,
+                        metric = "Accuracy")
+
+end_time <- Sys.time()
+
+# Calculate runtime
+runtime <- end_time - start_time
+print(paste("Model training runtime:", runtime))
+
+# Print the best model and its parameters
+print(svm_model_tune$bestTune)
+print(svm_model_tune)
+
+```
+
+```{r}
+
+```
+
+```{r}
+plot(svm_model_tune)
+```
+
+
+```{r}
+
+# Make predictions on the test set
+pred_svm_tune <- predict(svm_model_tune, Test_data3)
+
+# Evaluate the model
+conf_matrix_svm_tune <- table(pred_svm_tune, Test_data3$active_power_class)
+print(conf_matrix_svm_tune)
+
+ accuracy_svm_tune <- sum(pred_svm_tune == Test_data3$active_power_class) / length(pred_svm_tune)
+ print(accuracy_svm_tune)  
+
+```
+
+```{r}
+
+summary(Test_data3)
+
+```
+
+```{r}
+postResample(pred_svm_tune, Test_data3$active_power_class)
+
+```
+
+
+# Baseline model for decision tree
+```{r}
+set.seed(123)
+
+start_time <- Sys.time()
+# Train the Decision Tree model
+dt_model <- rpart(active_power_class ~ ., 
+                  data = Train_data2, 
+                  method = "class")
+end_time <- Sys.time()
+print(dt_model)
+runtime <- end_time - start_time
+print(paste("Model training runtime:", runtime))
+
+# Visualize the tree
+rpart.plot(dt_model, main = "Decision Tree for Active Power Class Prediction", extra = 102)
+
+
+```
+The root node has 24,212 samples with dominant class being low and important variable as lag active power.
+
+
+# Predictions and Model Evaluation of Baseline Model
+```{r}
+pred_dt_model <- predict(dt_model, Test_data2, type = "class")
+conf_matrix_dt <- confusionMatrix(pred_dt_model, Test_data2$active_power_class)
+print(conf_matrix_dt)
+
+```
+
+```{r}
+accuracy_dt <- conf_matrix_dt$overall['Accuracy']
+print(paste("Accuracy: ", accuracy_dt))
+```
+
+
+
+# Define the tuning grid for Decision Tree parameters
+```{r}
+tune_grid <- expand.grid(cp = seq(0.01, 0.1, by = 0.01))
+
+```
+
+# Decision Tree Model with Hyperparameters
+```{r}
+
+# Train the Decision Tree model with tuning
+set.seed(123)
+
+start_time <- Sys.time()
+
+dt_model_tune <- train(
+  active_power_class ~ .,
+  data = Train_data2,
+  method = "rpart",
+  trControl = ctrl,
+  tuneGrid = tune_grid,
+  metric = "Accuracy"
+)
+
+end_time <- Sys.time()
+runtime <- end_time - start_time
+print(paste("Model training runtime:", runtime))
+
+# print the tuned model
+print(dt_model_tune)
+```
+
+```{r}
+
+```
+
+# Visualize the best Decision Tree Model with tuned parameters
+```{r}
+rpart.plot(dt_model_tune$finalModel, main = "Best Tuned Decision Tree")
+```
+
+
+# Evaluation of DT tuned model
+```{r}
+pred_dt_tune <- predict(dt_model_tune, Test_data2, type = "raw")
+conf_matrix_dt_tune <- confusionMatrix(pred_dt_tune, Test_data2$active_power_class)
+print(conf_matrix_dt_tune)
+```
+
+# DT model accuracy with hyperparamenters
+```{r}
+accuracy_dt_tune <- conf_matrix_dt_tune$overall['Accuracy']
+print(paste("Accuracy: ", accuracy_dt_tune))
+
+postResample(pred_dt_tune, Test_data2$active_power_class)
+```
+# Rename the levels of the target variable to valid R variable names
+```{r}
+# Ensure the target variable is a factor
+Energy_New_df_selected2$active_power_class <- as.factor(Energy_New_df_selected2$active_power_class)
+
+# Rename the levels of the target variable to valid R variable names
+levels(Energy_New_df_selected2$active_power_class) <- make.names(levels(Energy_New_df_selected2$active_power_class))
+levels(Energy_New_df_selected2$active_power_class) <- gsub("\\.", "_", levels(Energy_New_df_selected2$active_power_class))
+
+# Check the new levels to ensure they are valid R variable names
+print(levels(Energy_New_df_selected2$active_power_class))
+
+set.seed(123) 
+
+# Create data partition 
+Train_partition2 <- createDataPartition(Energy_New_df_selected2$active_power_class, p = 0.8, list = FALSE)
+
+# Train and Test Split
+Train_data2 <- Energy_New_df_selected2[Train_partition2, ]
+Test_data2 <- Energy_New_df_selected2[-Train_partition2, ]
+
+```
+
+
+# Decision tree model with cross validation
+```{r}
+# Define training control for CV
+ctrl3 <- trainControl(method = "cv", number = 5, savePredictions = "final", classProbs = TRUE, summaryFunction = multiClassSummary)
+
+set.seed(123)  
+
+# Train the Decision Tree model with CV
+
+start_time <- Sys.time()
+
+dt_model_cv <- train(
+  active_power_class ~ .,
+  data = Train_data2,
+  method = "rpart",
+  trControl = ctrl3,
+  tuneLength = 10
+)
+
+end_time <- Sys.time()
+print(dt_model_cv)
+runtime <- end_time - start_time
+print(paste("Model training runtime:", runtime))
+
+# Output the model and plot it
+print(dt_model_cv)
+plot(dt_model_cv)
+
+```
+
+
+# Visualize the best decision tree
+```{r}
+rpart.plot(dt_model_cv$finalModel, main = "Optimal Decision Tree")
+
+```
+
+The tree structure consists of 7 nodes, with 3 decision nodes and 4 leaf nodes. The key feature is lag_active_power, which predicts active_power_class. Other features like current_apparent_power and apparent_power_squared have some predictive value.
+
+
+
+```{r}
+pred_dt_cv <- predict(dt_model_cv, Test_data2, type = "raw")
+conf_matrix_dt_cv <- confusionMatrix(pred_dt_cv, Test_data2$active_power_class)
+print(conf_matrix_dt_cv)
+```
+
+# DT model;s accuracy with cross validation
+```{r}
+accuracy_dt_cv <- conf_matrix_dt_cv$overall['Accuracy']
+print(paste("Accuracy: ", accuracy_dt_cv))
+
+```
+Model accuracy for decision tree with cv on the test data is 96.33%
+
+
+# Preparing the dataset for XGBoost 
+```{r}
+# Ensure that 'active_power_class' is numerically encoded properly
+Energy_New_df_selected2$active_power_class <- as.numeric(factor(Energy_New_df_selected2$active_power_class)) - 1
+
+# Split the data into training and testing sets
+set.seed(123) 
+train_indices <- sample(1:nrow(Energy_New_df_selected2), 0.8 * nrow(Energy_New_df_selected2), replace = FALSE)
+train_data <- Energy_New_df_selected2[train_indices, ]
+test_data <- Energy_New_df_selected2[-train_indices, ]
+
+# Prepare matrices for xgboost
+Xgb_train <- xgb.DMatrix(data = as.matrix(train_data[, -which(names(train_data) == "active_power_class")]), 
+                      label = train_data$active_power_class)
+Xgb_test <- xgb.DMatrix(data = as.matrix(test_data[, -which(names(test_data) == "active_power_class")]), 
+                     label = test_data$active_power_class)
+
+
+```
+
+
+# Baseline model for XGBoost
+```{r}
+# Number of boosting rounds
+nrounds <- 100
+
+set.seed(123)
+# Train the model
+
+start_time <- Sys.time()
+
+xgb_model <- xgb.train(
+  data = Xgb_train,
+  nrounds = nrounds,
+  objective = "multi:softprob",
+  num_class = length(unique(Energy_New_df_selected2$active_power_class)),
+  verbose = 0
+)
+end_time <- Sys.time()
+runtime <- end_time - start_time
+print(paste("Model training time:", runtime))
+
+print(xgb_model)
+
+```
+
+# Evaluate the baseline model for xgb
+```{r}
+
+# Make predictions on the test set
+pred_probs_xgb <- predict(xgb_model, Xgb_test)
+pred_labels_xgb <- max.col(matrix(pred_probs_xgb, ncol = length(unique(Energy_New_df_selected2$active_power_class)), byrow = TRUE)) - 1
+
+# Evaluate the model
+conf_matrix_xgb <- table(Predicted = pred_labels_xgb, Actual = test_data$active_power_class)
+print(conf_matrix_xgb)
+
+```
+It shows high accuracy, with most values concentrated along the main diagonal. However, there are few misclassifications, mainly between adjacent classes, suggesting the model might struggle distinguishing between closely related classes.
+
+
+# Accuracy for baseline model
+```{r}
+
+# Calculate accuracy
+accuracy_xgb <- sum(diag(conf_matrix_xgb)) / sum(conf_matrix_xgb)
+print(paste("Accuracy of Baseline Model for XGBoost:", accuracy_xgb))
+
+```
+the baseline XGBoost model achieved an accuracy of approximately 99.72%, suggesting that the model is performing exceptionally well in predicting the target variable.
+
+
+#  XGBoost with hyperparameter
+```{r}
+# Define hyperparameters
+params <- list(
+  booster = "gbtree",
+  objective = "multi:softprob",
+  num_class = length(unique(Energy_New_df_selected2$active_power_class)),
+  eval_metric = "mlogloss",
+  eta = 0.1,       #learning rate
+  max_depth = 6,
+  min_child_weight = 1,
+  subsample = 0.8,
+  colsample_bytree = 0.8,
+  gamma = 0  # Minimum loss reduction required to make a further partition on a leaf node
+)
+
+
+set.seed(123)
+# Train the model
+
+start_time <- Sys.time()
+
+xgb_model_tune <- xgb.train(
+  params = params,
+  data = Xgb_train,
+  nrounds = nrounds,
+  watchlist = list(eval = Xgb_test, train = Xgb_train),
+  early_stopping_rounds = 10,
+  verbose = 0
+)
+end_time <- Sys.time()
+runtime <- end_time - start_time
+print(paste("Model training time:", runtime))
+
+print(xgb_model_tune)
+
+```
+
+
+```{r}
+# Extract the evaluation log from the model
+evaluation_log <- xgb_model_tune$evaluation_log
+
+# Plot the log-loss for both training and testing sets
+plot(evaluation_log$iter, evaluation_log$train_mlogloss, type = "l", col = "blue", 
+     xlab = "Boosting Rounds", ylab = "Log-Loss", 
+     main = "Training and Validation Log-Loss over Boosting Rounds")
+lines(evaluation_log$iter, evaluation_log$eval_mlogloss, col = "red")
+
+# Add a legend
+legend("topright", legend = c("Training Log-Loss", "Validation Log-Loss"), 
+       col = c("blue", "red"), lty = 1)
+
+```
+
+
+# Evaluate XGBoost model with hyperparameters
+```{r}
+# Make predictions on the test set
+pred_probs_xgb_tune <- predict(xgb_model_tune, Xgb_test)
+pred_labels_xgb_tune <- max.col(matrix(pred_probs_xgb_tune, ncol = length(unique(Energy_New_df_selected2$active_power_class)), byrow = TRUE)) - 1
+
+# Evaluate the model
+conf_matrix_xgb_tune <- table(Predicted = pred_labels_xgb_tune, Actual = test_data$active_power_class)
+print(conf_matrix_xgb_tune)
+
+```
+
+# Accuracy for XGBoost model with tune parameters
+```{r}
+# Calculate accuracy
+accuracy_xgb_tune <- sum(diag(conf_matrix_xgb_tune)) / sum(conf_matrix_xgb_tune)
+print(paste("Accuracy of XGBoost Tuned:", accuracy_xgb_tune))
+```
+
+# XGBoost model with cross validation
+```{r}
+
+set.seed(123)
+# Xgb cross-validation
+
+start_time <- Sys.time()
+
+Xgb_cv <- xgb.cv(
+  params = params,
+  data = Xgb_train,
+  nrounds = nrounds,
+  nfold = 5,
+  showsd = TRUE,
+  print_every_n = 10,
+  early_stopping_rounds = 10,
+  maximize = FALSE
+)
+
+end_time <- Sys.time()
+runtime <- end_time - start_time
+print(paste("Model runtime for XGBoost_CV:", runtime))
+
+# Print the results of the cross-validation
+print(paste("Optimal number of trees: ", Xgb_cv$best_ntreelimit))
+
+
+```
+
+
+# Train the final model using the best number of rounds from cross-validation
+```{r}
+
+best_nrounds <- Xgb_cv$best_iteration
+Xgb_model_cv <- xgb.train(
+  params = params,
+  data = Xgb_train,
+  nrounds = best_nrounds
+)
+```
+
+
+# Evaluate trained XGBoost model with cv on test data
+```{r}
+# Predictions on the test set
+pred_probs_xgb_cv <- predict(Xgb_model_cv, Xgb_test)
+pred_labels_xgb_cv <- max.col(matrix(pred_probs_xgb_cv, ncol = length(unique(Energy_New_df_selected2$active_power_class)), byrow = TRUE)) - 1
+
+# Evaluate the model
+conf_matrix_xgb_cv <- table(Predicted = pred_labels_xgb_cv, Actual = test_data$active_power_class)
+print(conf_matrix_xgb_cv)
+```
+
+```{r}
+# Calculate accuracy
+accuracy_xgb_cv <- sum(diag(conf_matrix_xgb_cv)) / sum(conf_matrix_xgb_cv)
+print(paste("Accuracy of XGBoost with CV:", accuracy_xgb_cv))
+
+
+```
+
+# Converting the Xgb_model back to factor
+```{r}
+
+# Define the original class labels manually
+original_labels <- c("Low", "Medium_Low", "Medium_High", "High")
+
+# Convert the numeric actual labels in the test dataset back to the original factor levels
+test_data$active_power_class <- factor(test_data$active_power_class, levels = 0:3, labels = original_labels)
+
+# Make predictions on the test set
+pred_probs_xgb <- predict(xgb_model, Xgb_test)
+pred_labels_xgb <- max.col(matrix(pred_probs_xgb, ncol = length(original_labels), byrow = TRUE)) - 1
+
+# Convert the numeric predictions back to the original factor levels
+pred_labels_xgb <- factor(pred_labels_xgb, levels = 0:3, labels = original_labels)
+
+# Evaluate the model
+conf_matrix_xgb <- table(Predicted = pred_labels_xgb, Actual = test_data$active_power_class)
+print(conf_matrix_xgb)
+
+```
+
+
+# Converting the Xgb_model_tune back to factor
+```{r}
+
+# Make predictions on the test set
+pred_probs_xgb_tune <- predict(xgb_model_tune, Xgb_test)
+pred_labels_xgb_tune <- max.col(matrix(pred_probs_xgb_tune, ncol = length(original_labels), byrow = TRUE)) - 1
+
+# Convert the numeric predictions back to the original factor levels
+pred_labels_xgb_tune <- factor(pred_labels_xgb_tune, levels = 0:3, labels = original_labels)
+
+# Evaluate the model
+conf_matrix_xgb_tune <- table(Predicted = pred_labels_xgb_tune, Actual = test_data$active_power_class)
+print(conf_matrix_xgb_tune)
+
+```
+
+# Converting the Xgb_model_cv back to factor
+```{r}
+
+# Make predictions on the test set
+pred_probs_xgb_cv <- predict(Xgb_model_cv, Xgb_test)
+pred_labels_xgb_cv <- max.col(matrix(pred_probs_xgb_cv, ncol = length(original_labels), byrow = TRUE)) - 1
+
+# Convert the numeric predictions back to the original factor levels
+pred_labels_xgb_cv <- factor(pred_labels_xgb_cv, levels = 0:3, labels = original_labels)
+
+# Evaluate the model
+conf_matrix_xgb_cv <- table(Predicted = pred_labels_xgb_cv, Actual = test_data$active_power_class)
+print(conf_matrix_xgb_cv)
+
+
+```
+
+
+
+# Comparing model performance
+```{r}
+# Calculate the resampling results for each model
+  results <- list(
+  RF_Baseline = postResample(rf_pred, Test_data2$active_power_class),
+  RF_Tuned = postResample(rf_pred_tune, Test_data2$active_power_class),
+  SVM_Baseline = postResample(pred_svm, Test_data3$active_power_class),
+  SVM_CV = postResample(pred_svm_cv, Test_data3$active_power_class),
+  SVM_Tuned = postResample(pred_svm_tune, Test_data3$active_power_class),
+  DT_Baseline = postResample(pred_dt_model, Test_data2$active_power_class),
+  DT_Tuned = postResample(pred_dt_tune, Test_data2$active_power_class),
+  DT_CV = postResample(pred_dt_cv, Test_data2$active_power_class),
+  XGBoost_Baseline = postResample(pred_labels_xgb, test_data$active_power_class),
+  XGBoost_Tuned = postResample(pred_labels_xgb_tune, test_data$active_power_class),
+  XGBoost_CV = postResample(pred_labels_xgb_cv, test_data$active_power_class)
+)
+
+# Extract Accuracy and Kappa values into a data frame
+results_df <- data.frame(
+  Model = names(results),
+  Accuracy = as.numeric(sapply(results, `[[`, "Accuracy")),
+  Kappa = as.numeric(sapply(results, `[[`, "Kappa"))
+)
+
+# Calculate the error rate (1 - Accuracy)
+results_df$ErrorRate <- 1 - results_df$Accuracy
+
+# Round only the numeric columns for better readability
+results_df[, c("Accuracy", "Kappa", "ErrorRate")] <- round(results_df[, c("Accuracy", "Kappa", "ErrorRate")], 4)
+
+# Print the results
+print(results_df)
+
+```
+
+# Plot to visualize accuracy and error rate using bar chart
+```{r}
+
+# Plotting Accuracy
+ggplot(results_df, aes(x = Model, y = Accuracy, fill = Model)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Model Accuracy Comparison", y = "Accuracy", x = "Model") +
+  coord_flip()
+
+# Plotting Error Rate
+ggplot(results_df, aes(x = Model, y = ErrorRate, fill = Model)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Model Error Rate Comparison", y = "Error Rate", x = "Model") +
+  coord_flip()
+
+
+```
+
+
+```{r}
+
+# Save the best model
+# saveRDS(xgb_model, file = "XGBoost_Baseline_model.rds")
+
+# saveRDS(Xgb_model_cv, file = "XGBoost_CV_model.rds") 
+
+saveRDS(xgb_model_tune, file = "XGBoost_Tuned_model.rds")
+
+saveRDS(svm_model_tune, file = "SVM_Tuned_model.rds")
+
+
+
+```
+
+
+# Precision, Recall and F1 Score for Tuned XGBoost Model
+```{r}
+
+# Convert confusion matrix table to confusionMatrix object
+conf_matrix_xgb_tune <- confusionMatrix(pred_labels_xgb_tune, test_data$active_power_class)
+
+# Extract Precision, Recall, and F1 Score 
+precision_xgb_tune <- conf_matrix_xgb_tune$byClass[, "Pos Pred Value"]  
+recall_xgb_tune <- conf_matrix_xgb_tune$byClass[, "Sensitivity"] 
+
+# Calculate F1 Score
+f1_score_xgb_tune <- 2 * ((precision * recall) / (precision + recall))  
+
+# Combine into a data frame
+metrics_xgb_tune <- data.frame(
+  Class = rownames(conf_matrix_xgb_tune$byClass),
+  Precision = precision_xgb_tune,
+  Recall = recall_xgb_tune,
+  F1_Score = f1_score_xgb_tune
+)
+
+print(metrics_xgb_tune)
+
+```
+
+
+# ROC Curve for Tuned XGBoost Model
+```{r}
+
+
+# Ensure pred_probs_xgb_tune is correctly formatted
+pred_probs_xgb_tune <- predict(xgb_model_tune, Xgb_test)
+pred_probs_xgb_tune <- matrix(pred_probs_xgb_tune, ncol = length(original_labels), byrow = TRUE)
+
+# Setup plot area
+par(mfrow = c(2, 2))  # Adjust grid layout depending on the number of classes
+colors <- c("red", "blue", "green", "purple")  # Define colors for each ROC curve
+
+# Create a list to store ROC curves
+roc_curves_xgb_tune <- list()
+
+# Loop through each class to create the ROC curves
+for (i in 1:ncol(pred_probs_xgb_tune)) {
+    # Convert multi-class to binary class responses for the current class
+    binary_response <- factor(ifelse(test_data$active_power_class == original_labels[i], "pos", "neg"), levels = c("neg", "pos"))
+    
+    # Check if there are both positive and negative cases
+    if (sum(binary_response == "pos") > 0 && sum(binary_response == "neg") > 0) {
+        roc_curves_xgb_tune[[i]] <- roc(binary_response, pred_probs_xgb_tune[, i])
+        
+        # Plot the ROC curve
+        plot(roc_curves_xgb_tune[[i]], main = paste("ROC Curve for", original_labels[i]), col = colors[i])
+        
+        # Add a legend displaying the AUC, rounded to 3 decimals
+        legend("bottomright", legend = c(paste("AUC =", round(auc(roc_curves_xgb_tune[[i]]), 3))), fill = colors[i])
+    } else {
+        message(paste("Skipping ROC curve for", original_labels[i], ": No positive cases or no negative cases."))
+    }
+}
+
+
+
+
+
+```
+
+# Precision, Recall and F1 Score for SVM Tuned Model
+```{r}
+
+# Ensure that the Test_data3$active_power_class is a factor with the same levels as pred_svm_tune
+Test_data3$active_power_class <- factor(Test_data3$active_power_class, levels = levels(pred_svm_tune))
+
+# Create a confusion matrix
+conf_matrix_svm_tune <- confusionMatrix(pred_svm_tune, Test_data3$active_power_class)
+
+
+# Extract precision, recall, and F1 score for each class
+precision_svm_tune <- conf_matrix_svm_tune$byClass[, "Pos Pred Value"]  # Precision
+recall_svm_tune <- conf_matrix_svm_tune$byClass[, "Sensitivity"]        # Recall
+f1_score_svm_tune <- 2 * ((precision * recall) / (precision + recall))  # F1 Score
+
+# Combine these into a data frame for easier viewing
+metrics_svm_tune <- data.frame(
+  Class = rownames(conf_matrix_svm_tune$byClass),
+  Precision = precision_svm_tune,
+  Recall = recall_svm_tune,
+  F1_Score = f1_score_svm_tune
+)
+
+# Print the metrics
+print(metrics_svm_tune)
+
+
+
+```
+
+```{r}
+install.packages("here") # install.packages("here") 
+library(here)
+knitr::opts_knit$set(root.dir = here::here())
+
+
+
+```
+
+
+
