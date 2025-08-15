@@ -2,9 +2,13 @@
 
 > A comprehensive data science project analyzing residential energy consumption patterns in northeastern Mexico using machine learning approaches.
 
-**Author:** Samuel  
-**Date:** August 24, 2024  
-**Status:** ✅ Complete  
+## View the Interactive Report
+
+You can view the fully rendered HTML report online here:
+
+➡️ [Energy Analysis Report (Rendered HTML)](https://britwite88.github.io/energy_analysis/energy_analysis.html)
+
+This link will open the report with all interactive visualizations and content as intended.
 
 [![R](https://img.shields.io/badge/R-276DC3?style=flat&logo=r&logoColor=white)](https://www.r-project.org/)
 [![Machine Learning](https://img.shields.io/badge/ML-Random%20Forest%20%7C%20XGBoost%20%7C%20SVM-orange)](https://github.com/)
